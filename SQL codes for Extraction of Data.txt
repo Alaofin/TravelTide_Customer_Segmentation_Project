@@ -1,0 +1,69 @@
+WITH EligibleUsers AS (
+    SELECT 
+        user_id,
+        COUNT(session_id) AS total_sessions
+    FROM 
+        sessions
+    WHERE 
+        session_start > '2023-01-04'
+    GROUP BY 
+        user_id
+    HAVING 
+        COUNT(session_id) > 7
+),
+CustomerData AS (
+    SELECT 
+        u.user_id,
+        u.sign_up_date,
+        u.gender,
+        u.married,
+        u.has_children,
+        u.home_country,
+        u.home_city,
+        u.home_airport,
+        f.destination,
+        f.destination_airport,
+        fs.page_clicks,
+        f.base_fare_usd,
+        u.home_airport_lat,
+        u.home_airport_lon,
+        f.destination_airport_lat,
+        f.destination_airport_lon,
+        h.check_in_time,
+        h.check_out_time,
+        EXTRACT(YEAR FROM AGE(CURRENT_DATE, u.birthdate)) AS age,
+  			ROUND(AVG(EXTRACT(EPOCH FROM session_end - session_start) / 60.0), 1) AS avg_session_length,
+        COUNT(DISTINCT fs.session_id) AS num_sessions,
+        SUM(fs.flight_booked::int) AS total_flights_booked,
+        SUM(fs.hotel_booked::int) AS total_hotels_booked,
+        SUM(f.return_flight_booked::int) AS total_return_flights_booked,
+        COALESCE(SUM(f.checked_bags), 0) AS total_checked_bags,
+        SUM(fs.cancellation::int) AS cancellations,
+        COALESCE(SUM(fs.flight_discount_amount), 0) AS total_flight_discounts,
+        COALESCE(SUM(fs.hotel_discount_amount), 0) AS total_hotel_discounts,
+        SUM(h.rooms) AS total_rooms_booked
+    FROM 
+        users u
+    JOIN 
+        EligibleUsers eu ON u.user_id = eu.user_id
+    JOIN 
+        sessions fs ON u.user_id = fs.user_id
+    LEFT JOIN 
+        flights f ON fs.trip_id = f.trip_id
+    LEFT JOIN 
+        hotels h ON fs.trip_id = h.trip_id
+    WHERE 
+        fs.session_start > '2023-01-04'
+    GROUP BY 
+        u.user_id, u.sign_up_date, u.gender, u.married, u.has_children, 
+        u.home_country, u.home_city, u.home_airport, f.destination, 
+        f.destination_airport, fs.page_clicks, f.base_fare_usd, u.home_airport_lat,
+        u.home_airport_lon, f.destination_airport_lat, f.destination_airport_lon, 
+        h.check_in_time, h.check_out_time
+)
+
+SELECT 
+    *
+FROM 
+    CustomerData;
+
